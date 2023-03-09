@@ -488,8 +488,8 @@ class nn_model():
             
         return np.array(y_class_predicted)
 
-def load_fashion_mnist():
-    
+def load_fashion_mnist(scaling="standard"):
+    wandb.init("project-1")
     (X_train,y_train),(X_test,y_test)=fashion_mnist.load_data()
     classes={0:"T-shirt/top",1:"Trouser",2:"Pullover",3:"Dress",
              4:"Coat",5: "Sandal",6:"Shirt",7:"Sneaker",8:"Bag",
@@ -516,12 +516,18 @@ def load_fashion_mnist():
     
     wandb.log({"Examples":examples})
     
+    if scaling=="standard":
+      X_train=(train_x - np.mean(train_x,axis=0))/np.std(train_x,axis=0)
+      X_test (X_test - np.mean(X_test,axis=0))/np.std(X_test,axis=0)
+      
+    elif scaling=="MinMax":
+      X_train=(train_x - np.min(train_x,axis=0))/(np.max(train_x,axis=0)-np.min(train_x,axis=0))
+      X_test=(X_test - np.min(X_test,axis=0))/(np.max(X_test,axis=0)-np.min(X_test,axis=0))
     
-    X_train=(train_x - np.min(train_x,axis=0))/(np.max(train_x,axis=0)-np.min(train_x,axis=0))
-    X_test=(X_test - np.min(X_test,axis=0))/(np.max(X_test,axis=0)-np.min(X_test,axis=0))
-
     return (X_train,train_y),(X_test,y_test)
 
+
+data=load_fashion_mnist()
 sweep_configuration={
     "project": "project-1",
     "method" : "random",
@@ -584,7 +590,7 @@ def hyperparametric_tuning1():
     config.activation_function,config.loss_func,config.L2_decay)
     
     run.name=sweep_name
-    (X_train,y_train),(X_test,y_test)=load_fashion_mnist()
+    (X_train,y_train),(X_test,y_test)=data
     input_dimension = X_train[0].shape[0]
     num_of_classes=config.num_of_classes
     num_of_neurons_list = [config.hidden_layer_size]*(config.num_of_hidden_layers) +[num_of_classes]
