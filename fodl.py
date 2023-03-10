@@ -1,6 +1,10 @@
 import wandb
 import numpy as np
 from keras.datasets import fashion_mnist
+import plotly.express as px
+import wandb
+import numpy as np
+from queue import Queue
 
 wandb.login()
 
@@ -81,8 +85,8 @@ class nn_model():
             encoded_y[i][int(y[i])]=1
         
         return encoded_y
-
-
+    
+    
     def forward_propagation(self,input_x):
         layer_count=self.layers_count
         error=None
@@ -131,7 +135,7 @@ class nn_model():
                 self.grad_a[i-1]= self.grad_h[i-1] * (np.where(self.a[i-1]>0,np.ones(self.a[i-1].shape),
                                                       np.zeros(self.a[i-1].shape)))
                 
-            
+
     def compute_loss_accuracy(self,x,y,loss_func):
         accuracy=0
         loss=0
@@ -153,10 +157,43 @@ class nn_model():
         
         return accuracy,loss
     
+    def update_wei_bias_history(self,patience,w_history,b_history):
+        if w_history.qsize()<patience+1:
+            w_history.put(self.W)
+            b_history.put(self.b)
+        else:
+            w_history.get()
+            w_history.put(self.W)
+            b_history.get()
+            b_history.put(self.b)
+                
     
-    def gradient_descent(self,batch_size,max_epoch,learning_rate,training_x,training_y,val_x,val_y,l2_decay,loss_func):
+    def do_early_stopping(self,prev_loss,curr_loss,inc_val_count,w_history,b_history):
+        if curr_loss>prev_loss:
+            inc_val_count[0]+=1
+        if inc_val_count[0] == 3:
+            self.W= w_history.get()
+            self.b= b_history.get()
+            return True
+        return False
+        
+        
+    def gradient_descent(self,batch_size,max_epoch,learning_rate,training_x,training_y,val_x,val_y,
+                         l2_decay,loss_func,early_stopping,patience):
         num_of_layers=self.layers_count
         N=len(training_x)
+        weights_history= None
+        bias_history= None
+        incr_val_loss_count= None
+        
+        if early_stopping:
+            max_epoch=10**6
+            weights_history=Queue()
+            weights_history.put(self.W)
+            bias_history=Queue()
+            bias_history.put(self.h)
+            incr_val_loss_count=[0]
+            
         
         for epoch in range(1,max_epoch+1):
             count=0
@@ -178,14 +215,20 @@ class nn_model():
                         self.grad_W[k] = np.zeros(self.grad_W[k].shape)
                         self.grad_b[k] = np.zeros(self.grad_b[k].shape)
             
-            
+            prev_val_loss=val_loss
             training_accuracy,training_loss= self.compute_loss_accuracy(training_x,training_y,loss_func)            
             val_accuracy,val_loss=self.compute_loss_accuracy(val_x,val_y,loss_func)
+            
             
             wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
                        "train_loss":training_loss,
                       "val_accuracy":val_accuracy,
                       "val_loss": val_loss})
+            
+            if early_stopping:
+                self.update_wei_bais_history(patience,weights_history,bias_history)
+                if self.do_early_stopping(prev_val_loss,val_loss,incr_val_loss_count):
+                    break
 
             
                             
@@ -196,6 +239,18 @@ class nn_model():
         
         u_weights={i:0 for i in range(1,num_of_layers+1)}
         u_bias={i:0 for i in range(1,num_of_layers+1)}
+        
+        weights_history= None
+        bias_history= None
+        incr_val_loss_count= None
+        
+        if early_stopping:
+            max_epoch=10**6
+            weights_history=Queue()
+            weights_history.put(self.W)
+            bias_history=Queue()
+            bias_history.put(self.h)
+            incr_val_loss_count=[0]
         
         for epoch in range(1,max_epoch+1):
             count=0
@@ -232,6 +287,11 @@ class nn_model():
                        "val_accuracy":val_accuracy,
                        "val_loss": val_loss})
             
+            if early_stopping:
+                self.update_wei_bais_history(patience,weights_history,bias_history)
+                if self.do_early_stopping(prev_val_loss,val_loss,incr_val_loss_count):
+                    break
+            
             
     def NAG(self,batch_size,max_epoch,learning_rate,momentum_parameter,training_x,training_y,val_x,val_y,l2_decay,loss_func):
         
@@ -241,6 +301,18 @@ class nn_model():
         u_weights={i:0 for i in range(1,num_of_layers+1)}
         u_bias={i:0 for i in range(1,num_of_layers+1)}
         
+        weights_history= None
+        bias_history= None
+        incr_val_loss_count= None
+        
+        if early_stopping:
+            max_epoch=10**6
+            weights_history=Queue()
+            weights_history.put(self.W)
+            bias_history=Queue()
+            bias_history.put(self.h)
+            incr_val_loss_count=[0]
+            
         for epoch in range(1,max_epoch+1):
             count=0
             training_loss=0
@@ -283,6 +355,10 @@ class nn_model():
                        "train_loss":training_loss,
                        "val_accuracy":val_accuracy,
                        "val_loss": val_loss})
+            if early_stopping:
+                self.update_wei_bais_history(patience,weights_history,bias_history)
+                if self.do_early_stopping(prev_val_loss,val_loss,incr_val_loss_count):
+                    break
       
             
     def AdaGrad_RMSProp(self,batch_size,max_epoch,learning_rate,beta,eps,training_x,training_y,val_x,val_y,l2_decay,loss_func,option):
@@ -290,6 +366,18 @@ class nn_model():
         N=len(training_x)
         v_weights={i:0 for i in range(1,num_of_layers+1)}
         v_bias={i:0 for i in range(1,num_of_layers+1)}
+        
+        weights_history= None
+        bias_history= None
+        incr_val_loss_count= None
+        
+        if early_stopping:
+            max_epoch=10**6
+            weights_history=Queue()
+            weights_history.put(self.W)
+            bias_history=Queue()
+            bias_history.put(self.h)
+            incr_val_loss_count=[0]
         
         for epoch in range(1,max_epoch+1):
             count=0
@@ -323,6 +411,11 @@ class nn_model():
                        "train_loss":training_loss,
                        "val_accuracy":val_accuracy,
                        "val_loss": val_loss})
+            
+            if early_stopping:
+                self.update_wei_bais_history(patience,weights_history,bias_history)
+                if self.do_early_stopping(prev_val_loss,val_loss,incr_val_loss_count):
+                    break
 
             
     def Adam_NAdam(self,batch_size,max_epoch,learning_rate,beta_1,beta_2,eps,
@@ -336,6 +429,18 @@ class nn_model():
         
         m_weights={i:0 for i in range(1,num_of_layers+1)}
         m_bias={i:0 for i in range(1,num_of_layers+1)}
+        
+        weights_history= None
+        bias_history= None
+        incr_val_loss_count= None
+        
+        if early_stopping:
+            max_epoch=10**6
+            weights_history=Queue()
+            weights_history.put(self.W)
+            bias_history=Queue()
+            bias_history.put(self.h)
+            incr_val_loss_count=[0]
         
         for epoch in range(1,max_epoch+1):
             count=0
@@ -387,6 +492,10 @@ class nn_model():
                        "val_accuracy":val_accuracy,
                        "val_loss": val_loss})
             
+            if early_stopping:
+                self.update_wei_bais_history(patience,weights_history,bias_history)
+                if self.do_early_stopping(prev_val_loss,val_loss,incr_val_loss_count):
+                    break
                             
     def training(self,x,y,val_percent=0.1,loss_func="cross_entropy",optimizer="GD",
                  max_epoch=10,batch_size=1,learning_rate=0.02,beta=0.9,beta_1=0.99,beta_2=0.999,epsilon=10**-6,L2_decay=0,
@@ -446,7 +555,6 @@ class nn_model():
             y_class_predicted.append(np.argmax(self.h[L]))
             
         return np.array(y_class_predicted)
-
 
 
 def load_fashion_mnist(scaling="MinMax"):
@@ -646,3 +754,38 @@ sweep_configuration={
 
 sweep_id= wandb.sweep(sweep_configuration,project="project_1")
 wandb.agent(sweep_id,function=hyperparametric_tuning_1,count= 400)
+
+
+def data_augmentation(X_train,y_train):         #with just addition of noise
+    N=len(X_train)
+    dim=len(X_train[0])
+    for i in range(N):
+        categories=np.array([y_train[i],y_train[i]])
+        noise = np.random.normal(0,1,(2,dim))
+        X_train=np.vstack((X_train,noise))
+        y_train=np.hstack((y_train,categories))
+    
+    return X_train,y_train
+    
+def plot_confusion_matrix(y_predicted,y_actual,num_of_classes=10,title="Confusion Matrix : Fashion MNist Test Data",
+                          labels= ["Top","Trouser","Pullover","Dress","Coat",
+                                   "Sandal","Shirt","Sneaker","Bag","Ankle boot"]):
+    
+    run=wandb.init(project="project_1")
+    run.name="C_mat_{}".format(title)
+    confusion_matrix=np.zeros((num_of_classes,num_of_classes))
+    for i in range(len(y_predicted)):
+        confusion_matrix[y_predicted][y_actual]+=1
+    
+        
+    fig = px.imshow(data,
+                labels=dict(x="Actual Labels", y="True Labels", color="Count"),
+                x=labels,
+                y=labels,color_continuous_scale="viridis",text_auto=True
+               )
+    fig.update_xaxes(side="top")
+    wandb.log({title: fig})
+    wandb.log({title: wandb.plot.confusion_matrix(probs=None,
+                        y_true=y_actual, preds=y_predicted,
+                        class_names=labels)})
+    wandb.finish()
