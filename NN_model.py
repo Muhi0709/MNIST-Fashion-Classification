@@ -2,8 +2,6 @@ import wandb
 import numpy as np
 from queue import Queue
 
-wandb.login()
-
 class nn_model():
     W={0:None}
     b={0:None}
