@@ -1,7 +1,7 @@
 import numpy as np
 from keras.datasets import fashion_mnist,mnist
 
-def load_fashion_mnist(scaling="MinMax"):
+def get_fashion_mnist(scaling="MinMax"):
     r=np.random.default_rng(seed=100000)
     (X_train,y_train),(X_test,y_test)=fashion_mnist.load_data()
     num_of_examples=X_train.shape[0]
@@ -24,7 +24,7 @@ def load_fashion_mnist(scaling="MinMax"):
 
     return (train_x,train_y),(X_test,y_test)
 
-def load_mnist(scaling="MinMax"):
+def get_mnist(scaling="MinMax"):
     r=np.random.default_rng(seed=100001)
     (X_train,y_train),(X_test,y_test)=mnist.load_data()
     num_of_examples=X_train.shape[0]
