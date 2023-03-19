@@ -41,8 +41,8 @@ def get_mnist(scaling="MinMax"):
         train_x=(train_x - np.mean(train_x,axis=0))/np.std(train_x,axis=0)
         X_test=(X_test - np.mean(X_test,axis=0))/np.std(X_test,axis=0)
         
-    elif scaling=="MinMax":
-        train_x=(train_x - np.min(train_x,axis=0))/(np.max(train_x,axis=0)-np.min(train_x,axis=0))
-        X_test=(X_test - np.min(X_test,axis=0))/(np.max(X_test,axis=0)-np.min(X_test,axis=0))
+    else:
+        train_x=(train_x/255)
+        X_test=(X_test/255)
 
     return (train_x,train_y),(X_test,y_test)
