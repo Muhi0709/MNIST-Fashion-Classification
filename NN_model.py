@@ -117,29 +117,31 @@ class nn_model():
             elif self.activations[i]=="tanh":
                 self.h[i]=np.tanh(self.a[i])
             
-            elif self.activations[i]=="reLU":
+            elif self.activations[i]=="reLU" or self.activations[i]=="ReLU":
                 self.h[i]=np.maximum(self.a[i],np.zeros(self.a[i].shape))
             
             elif self.activations[i]=="softmax":
                 self.h[i]=(np.exp(self.a[i]).T/np.sum(np.exp(self.a[i]),axis=1)).T
-
+            
+            elif self.activations[i]=="identity":
+                self.h[i] = self.a[i]
             else:
                 print("unsupported activation function")
                 quit()
 
 
-    def back_propagation(self,batch_y,L2_decay=0,loss_func="cross_entropy",N="10000"):
+    def back_propagation(self,batch_y,L2_decay=0,loss_func="cross_entropy",N=10000):
         L=self.layers_count
         batch_size=len(batch_y)
         
         if self.activations[L]=="softmax" and loss_func=="cross_entropy":
             self.grad_a[L]=  self.h[L]-batch_y
             
-        elif self.activations[L]=="softmax" and loss_func=="mse":
+        elif self.activations[L]=="softmax" and (loss_func=="mse" or loss_func=="mean_squared_error"):
             self.grad_a[L]= (self.h[L] - batch_y) * self.h[L] * (1 - self.h[L])
 
         else:
-            print("unsupported loss function")
+            print("unsupported loss function or output layer activation")
             quit()
         
         for i in range(L,0,-1):
@@ -157,13 +159,16 @@ class nn_model():
                 
             elif self.activations[i-1]=="sigmoid":
                 self.grad_a[i-1]= self.grad_h[i-1] * (self.a[i-1] -self.a[i-1]**2)
+            
                 
             elif self.activations[i-1]=="tanh":
                 self.grad_a[i-1]=self.grad_h[i-1] * (1- (self.a[i-1])**2)
             
-            elif self.activations[i-1]=="reLU":
+            elif self.activations[i-1]=="reLU" or self.activations[i-1]=="ReLU":
                 self.grad_a[i-1]= self.grad_h[i-1] * (np.where(self.a[i-1]>0,np.ones(self.a[i-1].shape),
                                                       np.zeros(self.a[i-1].shape)))
+            elif self.activations[i-1]=="identity":
+                self.grad_a[i-1] = self.grad_h[i-1]
             else:
                 print("unsupported activation function")
                 quit()
@@ -182,7 +187,7 @@ class nn_model():
         if loss_func=="cross_entropy":
             loss = np.sum(-1*np.log2(self.h[L]) * y)
             
-        elif loss_func=="mse":
+        elif loss_func=="mse" or loss_func=="mean_squared_error":
             loss = np.sum(np.linalg.norm(self.h[L]-y,axis=1)**2)
         
         else:
@@ -216,10 +221,10 @@ class nn_model():
             return True
         return False
     
-    def do_data_augmentation(self,X_train,y_train):         
+    def do_data_augmentation(self,X_train,y_train,seed):         
         N=len(X_train)
         dim=len(X_train[0])
-        r=np.random.default_rng(seed=44)
+        r=np.random.default_rng(seed=seed)
         noise=r.normal(0,0.01,(N,dim))
         noised_signal=X_train+noise
         X_train=np.vstack((X_train,noised_signal))
@@ -228,7 +233,7 @@ class nn_model():
     
 
     def gradient_descent(self,max_epoch,learning_rate,training_x,training_y,batched_training_x,batched_training_y,val_x,val_y,
-                         l2_decay,loss_func,early_stopping,patience,seed):
+                         l2_decay,loss_func,early_stopping,patience,seed,wandb_log):
         
         num_of_layers=self.layers_count
         N=len(training_x)
@@ -264,10 +269,11 @@ class nn_model():
             print("-"*200)
 
             val_acc_hist.append(val_accuracy)
-            wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
-                       "train_loss":training_loss,
-                      "val_accuracy":val_accuracy,
-                      "val_loss": val_loss})
+            if wandb_log:
+                wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
+                           "train_loss":training_loss,
+                           "val_accuracy":val_accuracy,
+                           "val_loss": val_loss})
             
             if early_stopping:
                 self.update_wei_bias_history(patience,weights_history,bias_history)
@@ -281,7 +287,7 @@ class nn_model():
 
                
     def momentum_gd(self,max_epoch,learning_rate,momentum_parameter,training_x,training_y,batched_training_x,batched_training_y,val_x,
-                    val_y,l2_decay,loss_func,early_stopping,patience,seed):
+                    val_y,l2_decay,loss_func,early_stopping,patience,seed,wandb_log):
         
         num_of_layers = self.layers_count
         N=len(training_x)
@@ -321,10 +327,11 @@ class nn_model():
                                                                                 val_accuracy,val_loss))
             print("-"*200)
             val_acc_hist.append(val_accuracy)
-            wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
-                       "train_loss":training_loss,
-                      "val_accuracy":val_accuracy,
-                      "val_loss": val_loss})
+            if wandb_log:
+                wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
+                           "train_loss":training_loss,
+                           "val_accuracy":val_accuracy,
+                           "val_loss": val_loss})
             
             if early_stopping:
                 self.update_wei_bias_history(patience,weights_history,bias_history)
@@ -338,7 +345,7 @@ class nn_model():
             
             
     def NAG(self,max_epoch,learning_rate,momentum_parameter,training_x,
-            training_y,batched_training_x,batched_training_y,val_x,val_y,l2_decay,loss_func,early_stopping,patience,seed):
+            training_y,batched_training_x,batched_training_y,val_x,val_y,l2_decay,loss_func,early_stopping,patience,seed,wandb_log):
         
         num_of_layers = self.layers_count
         N=len(training_x)
@@ -385,10 +392,11 @@ class nn_model():
                                                                                 val_accuracy,val_loss))
             print("-"*200)
             val_acc_hist.append(val_accuracy)
-            wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
-                       "train_loss":training_loss,
-                      "val_accuracy":val_accuracy,
-                      "val_loss": val_loss})
+            if wandb_log:
+                wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
+                           "train_loss":training_loss,
+                           "val_accuracy":val_accuracy,
+                           "val_loss": val_loss})
             
             if early_stopping:
                 self.update_wei_bias_history(patience,weights_history,bias_history)
@@ -401,7 +409,7 @@ class nn_model():
             batched_training_x,batched_training_y=self.shuffle_batches(batched_training_x,batched_training_y,seed)
 
     def AdaGrad_RMSProp(self,max_epoch,learning_rate,rmsbeta,eps,training_x,training_y,batched_training_x,batched_training_y,
-                        val_x,val_y,l2_decay,loss_func,option,early_stopping,patience,seed):
+                        val_x,val_y,l2_decay,loss_func,option,early_stopping,patience,seed,wandb_log):
         
         num_of_layers = self.layers_count
         N=len(training_x)
@@ -430,9 +438,9 @@ class nn_model():
                 self.back_propagation(batched_training_y[j],l2_decay,loss_func,N)
  
                 for i in range(1,num_of_layers+1):
-                    v_weights[i]= (v_weights[i] + np.power(self.grad_W,2))\
+                    v_weights[i]= (v_weights[i] + np.power(self.grad_W[i],2))\
                      if option==0 else rmsbeta*v_weights[i] + (1-rmsbeta)*(np.power(self.grad_W[i],2))
-                    v_bias[i]= (v_bias[i] + np.power(self.grad_b,2)) \
+                    v_bias[i]= (v_bias[i] + np.power(self.grad_b[i],2)) \
                      if option==0 else rmsbeta*v_bias[i] + (1-rmsbeta)*np.power(self.grad_b[i],2)
                         
                     self.W[i] = self.W[i] - (learning_rate/(np.power(v_weights[i]+eps,0.5))) * self.grad_W[i]
@@ -444,10 +452,11 @@ class nn_model():
                                                                                 val_accuracy,val_loss))
             print("-"*200)
             val_acc_hist.append(val_accuracy)
-            wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
-                       "train_loss":training_loss,
-                      "val_accuracy":val_accuracy,
-                      "val_loss": val_loss})
+            if wandb_log:
+                wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
+                           "train_loss":training_loss,
+                           "val_accuracy":val_accuracy,
+                           "val_loss": val_loss})
             
             if early_stopping:
                 self.update_wei_bias_history(patience,weights_history,bias_history)
@@ -460,7 +469,7 @@ class nn_model():
             batched_training_x,batched_training_y=self.shuffle_batches(batched_training_x,batched_training_y,seed)
 
     def Adam_NAdam(self,max_epoch,learning_rate,beta_1,beta_2,eps,training_x,training_y,
-                   batched_training_x,batched_training_y,val_x,val_y,l2_decay,loss_func,option,early_stopping,patience,seed):
+                   batched_training_x,batched_training_y,val_x,val_y,l2_decay,loss_func,option,early_stopping,patience,seed,wandb_log):
         
         num_of_layers=self.layers_count
         N=len(training_x)
@@ -521,10 +530,11 @@ class nn_model():
                                                                                 val_accuracy,val_loss))
             print("-"*200)
             val_acc_hist.append(val_accuracy)
-            wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
-                       "train_loss":training_loss,
-                      "val_accuracy":val_accuracy,
-                      "val_loss": val_loss})
+            if wandb_log:
+                wandb.log({"epoch":epoch,"train_accuracy":training_accuracy,
+                           "train_loss":training_loss,
+                           "val_accuracy":val_accuracy,
+                           "val_loss": val_loss})
             
             if early_stopping:
                 self.update_wei_bias_history(patience,weights_history,bias_history)
@@ -539,60 +549,58 @@ class nn_model():
     def training(self,x,y,val_percent=0.1,loss_func="cross_entropy",optimizer="GD",
                  max_epoch=10,batch_size=1,learning_rate=0.02,beta=0.9,rmsbeta=0.9,
                  beta_1=0.99,beta_2=0.995,epsilon=10**-8,L2_decay=0.005,
-                 early_stopping=False,patience=3,data_augmentation=False,seed=0):
+                 early_stopping=False,patience=3,data_augmentation=False,seed=0,wandb_log=True):
         
         x,y=self.shuffle_dataset(x,y,seed)
         (training_x,training_y),(val_x,val_y)= self.train_val_split(x,y,val_percent)
         if data_augmentation:
-            training_x,training_y=self.do_data_augmentation(training_x,training_y)
+            training_x,training_y=self.do_data_augmentation(training_x,training_y,seed)
         N=len(training_x)
         encoded_training_y= self.one_hot_encoding(training_y)
         encoded_val_y=self.one_hot_encoding(val_y)
         
         if optimizer=="GD":
             batch_size=N
-        elif optimizer=="SGD":
+        elif optimizer=="SGD" or optimizer=="sgd":
             batch_size=1
         batched_training_x,batched_training_y= self.segregate_batches(training_x,encoded_training_y,batch_size)
       
         if optimizer=="GD":
             self.gradient_descent(max_epoch,learning_rate,training_x,encoded_training_y,batched_training_x,batched_training_y,val_x,
-                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed)
+                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed,wandb_log)
         
-        elif optimizer=="SGD":
+        elif optimizer=="SGD" or optimizer=="sgd":
             self.gradient_descent(max_epoch,learning_rate,training_x,encoded_training_y,batched_training_x,batched_training_y,val_x,
-                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed)
+                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed,wandb_log)
             
-        elif optimizer=="Mini_batch":
+        elif optimizer=="Mini_batch_GD":
             self.gradient_descent(max_epoch,learning_rate,training_x,encoded_training_y,batched_training_x,batched_training_y,val_x,
-                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed)
+                                  encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed,wandb_log)
             
-        elif optimizer=="momentumGD":
+        elif optimizer=="momentumGD" or optimizer=="momentum":
             self.momentum_gd(max_epoch,learning_rate,beta,training_x,encoded_training_y,batched_training_x,
-                             batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed)
+                             batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed,wandb_log)
             
-        elif optimizer=="Nesterov":
+        elif optimizer=="Nesterov" or optimizer=="nag":
             self.NAG(max_epoch,learning_rate,beta,training_x,encoded_training_y,batched_training_x,batched_training_y,val_x,
-                     encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed)
+                     encoded_val_y,L2_decay,loss_func,early_stopping,patience,seed,wandb_log)
             
         elif optimizer=="Adagrad":
-            self.AdaGrad_RMSprop(max_epoch,learning_rate,rmsbeta,epsilon,training_x,encoded_training_y,batched_training_x,batched_training_y,
-                                 val_x,encoded_val_y,L2_decay,loss_func,0,early_stopping,patience,seed)
-        
-        elif optimizer=="RMSprop":
             self.AdaGrad_RMSProp(max_epoch,learning_rate,rmsbeta,epsilon,training_x,encoded_training_y,batched_training_x,batched_training_y,
-                                 val_x,encoded_val_y,L2_decay,loss_func,1,early_stopping,patience,seed)
-        elif optimizer=="Adam":
+                                 val_x,encoded_val_y,L2_decay,loss_func,0,early_stopping,patience,seed,wandb_log)
+        
+        elif optimizer=="RMSprop" or optimizer=="rmsprop":
+            self.AdaGrad_RMSProp(max_epoch,learning_rate,rmsbeta,epsilon,training_x,encoded_training_y,batched_training_x,batched_training_y,
+                                 val_x,encoded_val_y,L2_decay,loss_func,1,early_stopping,patience,seed,wandb_log)
+        elif optimizer=="Adam" or optimizer=="adam":
             self.Adam_NAdam(max_epoch,learning_rate,beta_1,beta_2,epsilon,training_x,encoded_training_y,
-                            batched_training_x,batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,0,early_stopping,patience,seed)
-        elif optimizer=="NAdam":
+                            batched_training_x,batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,0,early_stopping,patience,seed,wandb_log)
+        elif optimizer=="NAdam" or optimizer=="nadam":
             self.Adam_NAdam(max_epoch,learning_rate,beta_1,beta_2,epsilon,training_x,encoded_training_y,
-                            batched_training_x,batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,1,early_stopping,patience,seed)
+                            batched_training_x,batched_training_y,val_x,encoded_val_y,L2_decay,loss_func,1,early_stopping,patience,seed,wandb_log)
             
     def predict(self,data_x,encoded=True):
-        num_of_classes = self.last_layer_neuron_count
         L=self.layers_count
-        
         self.forward_propagation(data_x)
         y_predicted=np.argmax(self.h[L],axis=1)
         if encoded:
