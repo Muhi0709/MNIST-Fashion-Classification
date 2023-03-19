@@ -49,8 +49,7 @@ def load_fashion_mnist(scaling="MinMax"):
 
 data=load_fashion_mnist()
 
-seed_value=0
-def hyperparametric_tuning_1():
+def hyperparametric_tuning():
     global seed_value
     config_defaults={
         "dataset": "fashion_mnist",
@@ -103,10 +102,12 @@ def hyperparametric_tuning_1():
     model.training(X_train,y_train,val_percent=config.val_percent,loss_func= config.loss,optimizer=config.optimizer,
                   max_epoch=config.epochs,batch_size=config.batch_size,learning_rate=config.learning_rate,
                   beta=config.momentum,rmsbeta=config.beta,beta_1=config.beta1,beta_2=config.beta2,epsilon=config.epsilon,L2_decay=config.weight_decay,
-                  early_stopping=config.early_stopping,patience=config.patience,data_augmentation=config.data_augmentation,seed=seed_value)
+                  early_stopping=config.early_stopping,patience=config.patience,data_augmentation=config.data_augmentation,seed=seed_value,wandb_log=True)
     seed_value+=1
 
-#1st sweep configuration: random search with run cap 300
+
+#1st sweep configuration: random search with run cap 350
+seed_value=0
 sweep_configuration_1={
     "project": "cs6910_assignment_1",
     "method" : "random",
@@ -115,7 +116,7 @@ sweep_configuration_1={
         "goal": "maximize",
         "name": "val_accuracy"
     },
-    "run_cap":300,
+    "run_cap":350,
     "parameters":{
         "epochs": {"values": [5,10,15],
                    "probabilities":[0.3,0.5,0.2]},
@@ -145,9 +146,9 @@ sweep_configuration_1={
     }
 }
 sweep_id= wandb.sweep(sweep_configuration_1,project="cs6910_assignment_1")
-wandb.agent(sweep_id,function=hyperparametric_tuning_1)
+wandb.agent(sweep_id,function=hyperparametric_tuning)
 
-#second_configuration: grid sweep of total runs 144
+#second_configuration: grid sweep of total runs 96
 seed_value=400
 sweep_configuration_2={
     "project": "cs6910_assignment_1",
@@ -162,11 +163,11 @@ sweep_configuration_2={
         "batch_size": {"values": [64]},
         "num_layers": {"values": [5]},
         "hidden_size": {"values": [64,128]},
-        "learning_rate": {"values": [0.0025,0.005,0.0075]},
+        "learning_rate": {"values": [0.00025,0.0005,0.00075]},
         "optimizer": {"values":
                      ["Adam","NAdam"],
                      },
-        "weight_decay": {"values": [0.05,0.005,0.001]
+        "weight_decay": {"values": [0.005,0.001]
                     },
         "weight_init": {"values": 
                                   ["Xavier"]
@@ -180,9 +181,81 @@ sweep_configuration_2={
     }
 }
 sweep_id= wandb.sweep(sweep_configuration_2,project="cs6910_assignment_1")
-wandb.agent(sweep_id,function=hyperparametric_tuning_1)
+wandb.agent(sweep_id,function=hyperparametric_tuning)
 
 
+def hyperparametric_fine_tuning():
+    global seed_value
+    config_defaults={
+        "dataset": "fashion_mnist",
+        "epochs": 15,
+        "batch_size": 64,
+        "num_layers": 5,
+        "hidden_size": 64,
+        "learning_rate": 2.5*(10**-4),
+        "momentum": 0.9,
+        "beta": 0.9,
+        "beta1":0.99,
+        "beta2":0.999,
+        "epsilon":10**-8,
+        "optimizer": "NAdam",
+        "weight_decay": 0.001,
+        "weight_init": "Xavier",
+        "activation": "leakyreLU",
+        "loss": "cross_entropy",
+        "leakyalpha":0.1,
+        "val_percent": 0.1,
+        "num_of_classes": 10,
+        "early_stopping": False,
+        "patience": 3,
+        "data_augmentation": False,       
+    }
+    
+    run=wandb.init(project="cs6910_assignment_1",config=config_defaults)
+    config=wandb.config
+    sweep_name="""ep_15_bs_64_hlnum_5_hlsize_64_lr_0.00025_opt_NAdam_init_Xavier_act_leakyreLU_loss_cross_entropy_l2_0.001
+    _leakyalpha_{}_early_stop_{}_patience_{}_augment_{}_wei_init_{}""".format(config.leakyalpha,config.early_stopping,config.patience,config.data_augmentation,config.weight_init)    
+    run.name=sweep_name
+    wandb.log({"Random_seed":seed_value})
+    (X_train,y_train),(X_test,y_test)=data
+    input_dimension = X_train[0].shape[0]
+    num_of_classes=config.num_of_classes
+    num_of_neurons_list = [config.hidden_size]*(config.num_layers) +[num_of_classes]
+    activation_func_list = ([config.activation]*(config.num_layers) + ["softmax"]) if config.activation!="leakyreLU" else ([(config.activation,config.leakyalpha)]*(config.num_layers) + ["softmax"])
+
+
+    model=nn_model()
+    model.compact_build_nn(input_dimension,config.num_layers+1,num_of_neurons_list,activation_func_list,
+                       config.weight_init,seed_value)
+    
+    model.training(X_train,y_train,val_percent=config.val_percent,loss_func= config.loss,optimizer=config.optimizer,
+                  max_epoch=config.epochs,batch_size=config.batch_size,learning_rate=config.learning_rate,
+                  beta=config.momentum,rmsbeta=config.beta,beta_1=config.beta1,beta_2=config.beta2,epsilon=config.epsilon,L2_decay=config.weight_decay,
+                  early_stopping=config.early_stopping,patience=config.patience,data_augmentation=config.data_augmentation,seed=seed_value,wandb_log=True)
+    seed_value+=1
+
+
+#third_configuration: grid sweep of total runs 48, with regularisation configurations,initialisation and leaky alpha values not used(set to False) in sweeps 1 and 2
+seed_value=600
+sweep_configuration_3={
+    "project": "cs6910_assignment_1",
+    "method" : "grid",
+    "name" : "hyperparameter_tuning_3",
+    "metric": {
+        "goal": "maximize",
+        "name": "val_accuracy"
+    },
+    "parameters":{
+        "leakyalpha": {"values": [0.01,0.05,0.1]},
+        "early_stopping": {"values": [True,False]},
+        "patience": {"values": [2,3]},
+        "data_augmentation": {"values": [True,False]},
+        "weight_init":{"values":["Xavier","He"]}
+    }
+}
+
+sweep_id= wandb.sweep(sweep_configuration_3,project="cs6910_assignment_1")
+wandb.agent(sweep_id,function=hyperparametric_fine_tuning)
 
 
 
