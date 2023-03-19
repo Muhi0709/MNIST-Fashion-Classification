@@ -70,6 +70,10 @@ sweep_configuration={
         "name": "val_accuracy"
     },
     "parameters":{
+        "optimizer": {"values" : 
+                      ["nadam","Mini_batch_GD"
+                      ]
+                    },
         "loss": {"values" : 
                       ["cross_entropy","mse"]
                       }  
