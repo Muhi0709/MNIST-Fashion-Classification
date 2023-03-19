@@ -19,4 +19,8 @@ other python scripts in the assignment, by importing this class definition in ot
   
   v) mnist_test.py: Python script that trains the three recommended network configurations over mnist datset and prints the test accuracies for each model. No training runs sent to my wandb project,only printing of training,validation accuracies and losses.
   
+  vi) data_loader.py: Python script that loads,shufflles and returns scaled versions of mnist and fashion mnist dataset. Used across other scripts for loading these datasets.
+  
+  vii) mse_cross_entropy.py: Python script that runs the wandb sweep for mse and cross entropy for the best configuration & another selected configuration.
+  
   
