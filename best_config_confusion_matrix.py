@@ -76,12 +76,12 @@ def plot_confusion_matrix(y_predicted,y_actual,num_of_classes=10,title="Confusio
                                    "Sandal","Shirt","Sneaker","Bag","Ankle boot"]):
     print("plotting confusion matrix")
     run=wandb.init(project="cs6910_assignment_1")
-    run.name="Con_mat_{}".format(title)
+    run.name="{}".format(title)
     confusion_matrix=np.zeros((num_of_classes,num_of_classes))
     for i in range(len(y_predicted)):
         confusion_matrix[y_predicted[i]][y_actual[i]]+=1
     fig = px.imshow(confusion_matrix,
-                labels=dict(x="Actual Labels", y="True Labels", color="Count"),
+                labels=dict(x="True Labels", y="Predicted Labels", color="Count"),
                 x=labels,
                 y=labels,color_continuous_scale="viridis",text_auto=True
                )
