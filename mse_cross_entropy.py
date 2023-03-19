@@ -2,44 +2,45 @@ from NN_model import nn_model
 from data_loader import get_fashion_mnist
 import wandb
 wandb.login()
-data=get_fashion_mnist
+data=get_fashion_mnist()
 
 def loss_func_tuning():
-    seed_value=0
+    seed_value=644
     config_defaults={
         "dataset": "fashion_mnist",
-        "epochs": 5,
-        "batch_size": 32,
-        "num_layers": 32,
+        "epochs": 15,
+        "batch_size": 64,
+        "num_layers": 5,
         "hidden_size": 64,
-        "learning_rate": 10**-3,
+        "learning_rate": 2.5 * (10**-4),
         "momentum": 0.9,
         "beta": 0.9,
         "beta1":0.99,
         "beta2":0.999,
         "epsilon":10**-8,
-        "optimizer": "Adam",
-        "weight_decay": 0.005,
+        "optimizer": "nadam",
+        "weight_decay": 0.001,
         "weight_init": "Xavier",
-        "activation": "sigmoid",
+        "activation": "leakyreLU",
         "loss": "cross_entropy",
         "leakyalpha":0.1,
         "val_percent": 0.1,
         "num_of_classes": 10,
         "early_stopping": False,
-        "patience": 3,
+        "patience": 2,
         "data_augmentation": False,       
     }
     
     run=wandb.init(project="cs6910_assignment_1",config=config_defaults)
     config=wandb.config
-    sweep_name="ep_{}_bs_{}_hlnum_{}_hlsize_{}_lr_{}_opt_{}_init_{}_act_{}_loss_{}_l2_{}".format(config.epochs,config.batch_size,
-                                                                                                 config.num_layers,
-                                                                                                 config.hidden_size,config.learning_rate,
-                                                                                                 config.optimizer,config.weight_init,
-                                                                                                 config.activation,config.loss,
-                                                                                                 config.weight_decay
-                                                                                                 )
+    sweep_name="ep_{}_bs_{}_hlnum_{}_hlsize_{}_lr_{}_opt_{}_init_{}_act_{}_loss_{}_l2_{}_leakyalpha_{}__early_{}_patie_{}_augment_{}".format(config.epochs,config.batch_size,
+                                                                                                                        config.num_layers,
+                                                                                                                        config.hidden_size,config.learning_rate,
+                                                                                                                        config.optimizer,config.weight_init,
+                                                                                                                        config.activation,config.loss,
+                                                                                                                        config.weight_decay,config.leakyalpha,config.early_stopping,
+                                                                                                                        config.patience,
+                                                                                                                        config.data_augmentation)
     
     run.name=sweep_name
 
@@ -57,13 +58,13 @@ def loss_func_tuning():
     model.training(X_train,y_train,val_percent=config.val_percent,loss_func= config.loss,optimizer=config.optimizer,
                   max_epoch=config.epochs,batch_size=config.batch_size,learning_rate=config.learning_rate,
                   beta=config.momentum,rmsbeta=config.beta,beta_1=config.beta1,beta_2=config.beta2,epsilon=config.epsilon,L2_decay=config.weight_decay,
-                  early_stopping=config.early_stopping,patience=config.patience,data_augmentation=config.data_augmentation,seed=seed_value)
+                  early_stopping=config.early_stopping,patience=config.patience,data_augmentation=config.data_augmentation,seed=seed_value,wandb_log=True)
 
 
 sweep_configuration={
     "project": "cs6910_assignment_1",
     "method" : "grid",
-    "name" : "hyperparameter_tuning_2",
+    "name" : "mse_v_cross_entropy",
     "metric": {
         "goal": "maximize",
         "name": "val_accuracy"
