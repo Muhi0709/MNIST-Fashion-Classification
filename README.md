@@ -1,4 +1,4 @@
-# cs6910_assignment_1
+## MNIST Fashion Datset Classification
 
 i) NN_model.py : Python script that contains the definition of the "nn_model" class whose objects are the feed-forward neural network model used in all
 other python scripts in the assignment, by importing this class definition in other scripts.
